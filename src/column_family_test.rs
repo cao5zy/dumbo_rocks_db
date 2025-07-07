@@ -61,6 +61,9 @@ fn test_crud_operations() -> Result<()> {
     assert!(all_users.contains(&user1));
     assert!(all_users.contains(&user2));
 
+    // Count all
+    assert_eq!(user_cf.count_all().unwrap(), 2);
+
     // Update
     let updated_user = TestUser {
         id: "001".to_string(),

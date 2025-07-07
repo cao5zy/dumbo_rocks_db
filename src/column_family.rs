@@ -27,6 +27,7 @@ pub trait Keyable: serde::Serialize + serde::de::DeserializeOwned {
 /// - 按主键查询(`get`)
 /// - 删除记录(`del`)
 /// - 插入/更新记录(`set`)
+/// - 记录总数统计(`count_all`)
 pub struct ColumnFamily<T: Keyable> {
     _phantom: std::marker::PhantomData<T>,
 }
@@ -166,5 +167,34 @@ impl<T: Keyable> ColumnFamily<T> {
             .db
             .put_cf(&cf_handle, key, value)
             .context("Failed to write item to database")
+    }
+
+    /// 统计当前列族中的记录总数
+    ///
+    /// # 返回值
+    /// - `Ok(usize)`: 当前列族中的记录总数
+    /// - `Err`: 当发生以下情况时返回错误：
+    ///   - 无法获取列族句柄
+    ///   - 数据库迭代失败
+    pub fn count_all(&self) -> Result<usize> {
+        let cf_handle = DbContext::get_instance()
+            .db
+            .cf_handle(T::column_family())
+            .context(format!(
+                "Failed to get {} column family handle",
+                T::column_family()
+            ))?;
+
+        let iter = DbContext::get_instance()
+            .db
+            .iterator_cf(&cf_handle, IteratorMode::Start);
+
+        let mut count = 0;
+        for item in iter {
+            item.context("Failed to read database entry")?;
+            count += 1;
+        }
+
+        Ok(count)
     }
 }

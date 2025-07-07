@@ -76,6 +76,7 @@ user_cf.del("001")?;
 - `set(item: &T) -> Result<()>`：插入/更新数据
 - `del(key: &str) -> Result<()>`：删除数据
 - `get_all() -> Result<Vec<T>>`：获取列族全部数据
+- `count_all() -> Result<usize>`: 获取总的记录数
 
 ### `Keyable` trait
 数据模型必须实现的特征：
