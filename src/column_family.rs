@@ -197,4 +197,56 @@ impl<T: Keyable> ColumnFamily<T> {
 
         Ok(count)
     }
+
+    /// 保持列族大小不超过指定限制
+    ///
+    /// 如果当前记录数超过限制，则删除最早的数据(按照RocksDB索引顺序)
+    ///
+    /// # 参数
+    /// - `size`: 允许的最大记录数
+    ///
+    /// # 返回值
+    /// - `Ok(())`: 操作成功
+    /// - `Err`: 当发生以下情况时返回错误：
+    ///   - 无法获取列族句柄
+    ///   - 数据库操作失败
+    pub fn keep_size(&self, size: usize) -> Result<()> {
+        let current_count = self.count_all()?;
+        if current_count <= size {
+            return Ok(());
+        }
+
+        let cf_handle = DbContext::get_instance()
+            .db
+            .cf_handle(T::column_family())
+            .context(format!(
+                "Failed to get {} column family handle",
+                T::column_family()
+            ))?;
+
+        let db = &DbContext::get_instance().db;
+        let mut batch = rocksdb::WriteBatch::default();
+        let iter = db.iterator_cf(&cf_handle, IteratorMode::Start);
+
+        let mut keys_to_delete = Vec::new();
+        let items_to_keep = current_count - size;
+
+        for (i, item) in iter.enumerate() {
+            let (key, _) = item.context("Failed to read database entry")?;
+            if i < items_to_keep {
+                keys_to_delete.push(key.to_vec());
+            } else {
+                break;
+            }
+        }
+
+        for key in keys_to_delete {
+            batch.delete_cf(&cf_handle, &key);
+        }
+
+        db.write(batch)
+            .context("Failed to execute batch delete operation")?;
+
+        Ok(())
+    }
 }

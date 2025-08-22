@@ -77,6 +77,7 @@ user_cf.del("001")?;
 - `del(key: &str) -> Result<()>`：删除数据
 - `get_all() -> Result<Vec<T>>`：获取列族全部数据
 - `count_all() -> Result<usize>`: 获取总的记录数
+- `keep_size(size: usize)`: 根据索引的顺序，保留指定数量的数据，超过这个数量的就删除 (0.2.0)
 
 ### `Keyable` trait
 数据模型必须实现的特征：
@@ -88,5 +89,14 @@ pub trait Keyable: Serialize + DeserializeOwned {
     /// 返回对应的列族名称
     fn column_family() -> &'static str;
 }
+```
+### 生成时序相关的索引(0.2.0)
+```rust
+use dumbo_rocks_db::generate_timestamp_index;
+
+
+let start_time = chrono::Utc::now();
+let id_name : &str = "warning";
+let index_id = generate_timestamp_index(id_name, start_time);
 ```
 
