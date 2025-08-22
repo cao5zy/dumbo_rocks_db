@@ -249,4 +249,50 @@ impl<T: Keyable> ColumnFamily<T> {
 
         Ok(())
     }
+
+    /// 根据时间索引范围过滤数据
+    ///
+    /// 假设数据是按照时间索引键值排序的
+    ///
+    /// # 参数
+    /// - `start_time`: 起始时间戳(包含)
+    /// - `end_time`: 结束时间戳(包含)
+    ///
+    /// # 返回值
+    /// - `Ok(Vec<T>)`: 符合时间范围的所有记录
+    /// - `Err`: 当发生以下情况时返回错误：
+    ///   - 无法获取列族句柄
+    ///   - 数据库迭代失败
+    ///   - 数据反序列化失败
+    pub fn filter_by_time_index(&self, start_time: u64, end_time: u64) -> Result<Vec<T>> {
+        let cf_handle = DbContext::get_instance()
+            .db
+            .cf_handle(T::column_family())
+            .context(format!(
+                "Failed to get {} column family handle",
+                T::column_family()
+            ))?;
+
+        let max_timestamp = i64::MAX as u64;
+        let start_key = (max_timestamp - end_time).to_string();
+        let end_key = (max_timestamp - start_time).to_string();
+
+        let mut items = Vec::new();
+        let iter = DbContext::get_instance()
+            .db
+            .iterator_cf(&cf_handle, IteratorMode::Start);
+
+        for item in iter {
+            let (key, value) = item.context("Failed to read database entry")?;
+            let key_str = String::from_utf8(key.to_vec()).context("Invalid UTF-8 in key")?;
+            
+            // 检查key是否在范围内
+            if key_str >= start_key && key_str <= end_key {
+                let item: T = deserialize_from_bytes(&value)?;
+                items.push(item);
+            }
+        }
+
+        Ok(items)
+    }
 }
